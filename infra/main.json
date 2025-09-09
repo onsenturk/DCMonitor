@@ -1,0 +1,1051 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+  "contentVersion": "1.0.0.0",
+  "metadata": {
+    "_generator": {
+      "name": "bicep",
+      "version": "0.30.23.60470",
+      "templateHash": "3784014032575561113"
+    }
+  },
+  "parameters": {
+    "location": {
+      "type": "string",
+      "metadata": {
+        "description": "Deployment location"
+      }
+    },
+    "workspaceName": {
+      "type": "string",
+      "metadata": {
+        "description": "Log Analytics workspace name"
+      }
+    },
+    "emailReceivers": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Email receivers for action group"
+      }
+    },
+    "dcResourceIds": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Domain Controller Azure resource IDs (VMs or Arc machines) for metric alerts scope"
+      }
+    },
+    "cpuScope": {
+      "type": "array",
+      "defaultValue": [],
+      "metadata": {
+        "description": "Scope for CPU metric alert (VM/Arc resource IDs) if different from dcResourceIds"
+      }
+    },
+    "retentionInDays": {
+      "type": "int",
+      "defaultValue": 90,
+      "metadata": {
+        "description": "Workspace retention days"
+      }
+    },
+    "dbDriveInstanceName": {
+      "type": "string",
+      "defaultValue": "C:",
+      "metadata": {
+        "description": "AD database drive letter instance (e.g. C:, D:) passed to alerts"
+      }
+    },
+    "logDriveInstanceName": {
+      "type": "string",
+      "defaultValue": "C:",
+      "metadata": {
+        "description": "AD log drive letter instance (e.g. C:, D:) passed to alerts"
+      }
+    }
+  },
+  "resources": [
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "law",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "workspaceName": {
+            "value": "[parameters('workspaceName')]"
+          },
+          "location": {
+            "value": "[parameters('location')]"
+          },
+          "retentionInDays": {
+            "value": "[parameters('retentionInDays')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.30.23.60470",
+              "templateHash": "5817335615776722092"
+            }
+          },
+          "parameters": {
+            "workspaceName": {
+              "type": "string",
+              "metadata": {
+                "description": "Name of the Log Analytics workspace"
+              }
+            },
+            "location": {
+              "type": "string",
+              "metadata": {
+                "description": "Azure region"
+              }
+            },
+            "retentionInDays": {
+              "type": "int",
+              "defaultValue": 90,
+              "minValue": 30,
+              "maxValue": 730,
+              "metadata": {
+                "description": "Retention in days (30-730)"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.OperationalInsights/workspaces",
+              "apiVersion": "2022-10-01",
+              "name": "[parameters('workspaceName')]",
+              "location": "[parameters('location')]",
+              "sku": {
+                "name": "PerGB2018"
+              },
+              "properties": {
+                "retentionInDays": "[parameters('retentionInDays')]",
+                "features": {
+                  "enableLogAccessUsingOnlyResourcePermissions": true
+                }
+              },
+              "tags": {
+                "azd-env-name": "[deployment().name]",
+                "solution": "dc-monitor"
+              }
+            }
+          ],
+          "outputs": {
+            "workspaceId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName'))]"
+            },
+            "workspaceNameOut": {
+              "type": "string",
+              "value": "[parameters('workspaceName')]"
+            },
+            "customerId": {
+              "type": "string",
+              "value": "[reference(resourceId('Microsoft.OperationalInsights/workspaces', parameters('workspaceName')), '2022-10-01').customerId]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "actionGroup",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "emailReceivers": {
+            "value": "[parameters('emailReceivers')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.30.23.60470",
+              "templateHash": "15343054532256948899"
+            }
+          },
+          "parameters": {
+            "actionGroupName": {
+              "type": "string",
+              "defaultValue": "ag-dc-monitor",
+              "metadata": {
+                "description": "Action Group name"
+              }
+            },
+            "shortName": {
+              "type": "string",
+              "defaultValue": "DCMON",
+              "maxLength": 12,
+              "metadata": {
+                "description": "Short name (12 chars max)"
+              }
+            },
+            "emailReceivers": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Email recipients for alerts"
+              }
+            }
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/actionGroups",
+              "apiVersion": "2022-06-15",
+              "name": "[parameters('actionGroupName')]",
+              "location": "global",
+              "properties": {
+                "copy": [
+                  {
+                    "name": "emailReceivers",
+                    "count": "[length(parameters('emailReceivers'))]",
+                    "input": {
+                      "name": "[parameters('emailReceivers')[copyIndex('emailReceivers')].name]",
+                      "emailAddress": "[parameters('emailReceivers')[copyIndex('emailReceivers')].emailAddress]",
+                      "useCommonAlertSchema": "[equals(parameters('emailReceivers')[copyIndex('emailReceivers')].useCommonAlertSchema, true())]"
+                    }
+                  }
+                ],
+                "groupShortName": "[parameters('shortName')]",
+                "enabled": true
+              },
+              "tags": {
+                "solution": "dc-monitor"
+              }
+            }
+          ],
+          "outputs": {
+            "actionGroupId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/actionGroups', parameters('actionGroupName'))]"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "dcrWinEvents",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "workspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'law'), '2022-09-01').outputs.workspaceId.value]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.30.23.60470",
+              "templateHash": "6828141476332367422"
+            }
+          },
+          "parameters": {
+            "workspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Target Log Analytics workspace resource ID"
+              }
+            },
+            "dcrName": {
+              "type": "string",
+              "defaultValue": "dcr-dc-winevents",
+              "metadata": {
+                "description": "Data Collection Rule name"
+              }
+            },
+            "channels": {
+              "type": "array",
+              "defaultValue": [
+                {
+                  "name": "System",
+                  "xPathQueries": [
+                    "*"
+                  ]
+                },
+                {
+                  "name": "Application",
+                  "xPathQueries": [
+                    "*"
+                  ]
+                },
+                {
+                  "name": "Directory Service",
+                  "xPathQueries": [
+                    "*"
+                  ]
+                },
+                {
+                  "name": "DNS Server",
+                  "xPathQueries": [
+                    "*"
+                  ]
+                },
+                {
+                  "name": "Security",
+                  "xPathQueries": [
+                    "*"
+                  ]
+                }
+              ],
+              "metadata": {
+                "description": "Event Log channels to collect from"
+              }
+            },
+            "enablePerfCounters": {
+              "type": "bool",
+              "defaultValue": true,
+              "metadata": {
+                "description": "Enable performance counter collection (LogicalDisk % Free Space)"
+              }
+            }
+          },
+          "variables": {
+            "perfCounters": "[if(parameters('enablePerfCounters'), createArray(createObject('name', 'perf-logicaldisk-freespace', 'streams', createArray('Microsoft-Perf'), 'samplingFrequencyInSeconds', 60, 'counterSpecifiers', createArray('\\LogicalDisk(*)\\% Free Space'))), createArray())]"
+          },
+          "resources": [
+            {
+              "type": "Microsoft.Insights/dataCollectionRules",
+              "apiVersion": "2022-06-01",
+              "name": "[parameters('dcrName')]",
+              "location": "[resourceGroup().location]",
+              "properties": {
+                "destinations": {
+                  "logAnalytics": [
+                    {
+                      "name": "ladest",
+                      "workspaceResourceId": "[parameters('workspaceId')]"
+                    }
+                  ]
+                },
+                "dataFlows": "[concat(createArray(createObject('streams', createArray('Microsoft-Event'), 'destinations', createArray('ladest'), 'transformKql', '')), if(parameters('enablePerfCounters'), createArray(createObject('streams', createArray('Microsoft-Perf'), 'destinations', createArray('ladest'), 'transformKql', '')), createArray()))]",
+                "dataSources": {
+                  "copy": [
+                    {
+                      "name": "windowsEventLogs",
+                      "count": "[length(parameters('channels'))]",
+                      "input": {
+                        "name": "[format('wev-{0}', toLower(replace(parameters('channels')[copyIndex('windowsEventLogs')].name, ' ', '-')))]",
+                        "streams": [
+                          "Microsoft-Event"
+                        ],
+                        "xPathQueries": "[parameters('channels')[copyIndex('windowsEventLogs')].xPathQueries]"
+                      }
+                    }
+                  ],
+                  "performanceCounters": "[variables('perfCounters')]"
+                }
+              },
+              "tags": {
+                "solution": "dc-monitor"
+              }
+            }
+          ],
+          "outputs": {
+            "dcrId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/dataCollectionRules', parameters('dcrName'))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'law')]"
+      ],
+      "metadata": {
+        "description": "Windows Event DCR for Domain Controllers"
+      }
+    },
+    {
+      "type": "Microsoft.Resources/deployments",
+      "apiVersion": "2022-09-01",
+      "name": "alerts",
+      "properties": {
+        "expressionEvaluationOptions": {
+          "scope": "inner"
+        },
+        "mode": "Incremental",
+        "parameters": {
+          "workspaceId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'law'), '2022-09-01').outputs.workspaceId.value]"
+          },
+          "actionGroupId": {
+            "value": "[reference(resourceId('Microsoft.Resources/deployments', 'actionGroup'), '2022-09-01').outputs.actionGroupId.value]"
+          },
+          "cpuScope": "[if(greater(length(parameters('cpuScope')), 0), createObject('value', parameters('cpuScope')), createObject('value', parameters('dcResourceIds')))]",
+          "dbDriveInstanceName": {
+            "value": "[parameters('dbDriveInstanceName')]"
+          },
+          "logDriveInstanceName": {
+            "value": "[parameters('logDriveInstanceName')]"
+          }
+        },
+        "template": {
+          "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+          "contentVersion": "1.0.0.0",
+          "metadata": {
+            "_generator": {
+              "name": "bicep",
+              "version": "0.30.23.60470",
+              "templateHash": "14321641836690726056"
+            }
+          },
+          "parameters": {
+            "workspaceId": {
+              "type": "string",
+              "metadata": {
+                "description": "Log Analytics workspace resource ID"
+              }
+            },
+            "actionGroupId": {
+              "type": "string",
+              "metadata": {
+                "description": "Action Group Resource ID for alert notifications"
+              }
+            },
+            "alertPrefix": {
+              "type": "string",
+              "defaultValue": "dc",
+              "metadata": {
+                "description": "Prefix for alert rule names"
+              }
+            },
+            "cpuSeverity": {
+              "type": "int",
+              "defaultValue": 2,
+              "metadata": {
+                "description": "Alert severity (0-4) for high CPU"
+              }
+            },
+            "cpuThreshold": {
+              "type": "int",
+              "defaultValue": 85,
+              "metadata": {
+                "description": "Average CPU percentage threshold over 15m"
+              }
+            },
+            "dbDriveInstanceName": {
+              "type": "string",
+              "defaultValue": "C:",
+              "metadata": {
+                "description": "LogicalDisk instance name for AD database volume (e.g. C:, D:)"
+              }
+            },
+            "logDriveInstanceName": {
+              "type": "string",
+              "defaultValue": "C:",
+              "metadata": {
+                "description": "LogicalDisk instance name for AD log volume (e.g. C:, D:)"
+              }
+            },
+            "cpuScope": {
+              "type": "array",
+              "defaultValue": [],
+              "metadata": {
+                "description": "Optional: List of VM/Arc machine resource IDs for CPU metric alert"
+              }
+            }
+          },
+          "variables": {
+            "severityMap": {
+              "Critical": 0,
+              "High": 1,
+              "Medium": 2,
+              "Low": 3,
+              "Info": 4
+            },
+            "fiveMinuteCount": "| summarize EventCount = count() by bin(TimeGenerated, 5m), Computer",
+            "alertDefinitions": [
+              {
+                "nameSuffix": "ad-db-corrupt",
+                "displayName": "AD DB Corrupt",
+                "description": "Active Directory database is corrupt",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and Source == \"NTDS ISAM\" and EventID == 467 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "ad-disk-full",
+                "displayName": "AD DB Disk Full",
+                "description": "AD cannot update object because disk with database is full",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and (EventID == 1480 or RenderedDescription has \"disk containing the database is full\") {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "replication-all-failing",
+                "displayName": "All Replication Partners Failing",
+                "description": "All replication partners failing",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID == 1566 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "netlogon-machine-deleted",
+                "displayName": "DC Machine Account Deleted",
+                "description": "DC will not start because its machine account has been deleted",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"NETLOGON\" and EventID in (5722,5805) {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "dns-zone-expired",
+                "displayName": "DNS Zone Expired",
+                "description": "DNS Zone Expired",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"DNS Server\" and EventID == 6527 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "dns-zone-not-loaded",
+                "displayName": "DNS Zone Not Loaded",
+                "description": "DNS Zone Not loaded",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"DNS Server\" | where EventID in (4000,4007,4013) {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "kdc-service-stopped",
+                "displayName": "KDC Service Not Running",
+                "description": "Kerberos Key Distribution Center service stopped",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" and EventID == 7036 and RenderedDescription has \"Kerberos Key Distribution Center\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "lingering-object",
+                "displayName": "Lingering Object Detected",
+                "description": "Lingering object detected; replication blocked",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID == 1988 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "adds-service-stopped",
+                "displayName": "AD DS Service Stopped",
+                "description": "AD DS service stopped",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" and EventID == 7036 and RenderedDescription has_all (\"Active Directory Domain Services\",\"stopped\") {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "sysvol-unavailable",
+                "displayName": "SYSVOL Unavailable",
+                "description": "SYSVOL share is not available or accessible",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"DFS Replication\" and EventID == 2213 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "no-longer-dc",
+                "displayName": "Server No Longer DC",
+                "description": "Server no longer a domain controller",
+                "severity": "Critical",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and RenderedDescription has \"no longer a domain controller\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "mutual-auth-spn",
+                "displayName": "Mutual Auth SPN Issue",
+                "description": "Cannot construct mutual authentication SPN",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID == 1411 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "replication-delayed",
+                "displayName": "Replication Delayed",
+                "description": "Replication error / delayed",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and Source == \"NTDS KCC\" and EventID in (1865,1311) {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "dhcp-service-stopped",
+                "displayName": "DHCP Service Stopped",
+                "description": "DHCP Service stopped",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" and EventID == 7036 and RenderedDescription has_all (\"DHCP Server\",\"stopped\") {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "dns-registration-failing",
+                "displayName": "DNS Registration Failing",
+                "description": "DNS registrations of essential DC records failing",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"NETLOGON\" | where EventID in (5774,5781) {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "schema-master-bind-fail",
+                "displayName": "Schema Master Bind Fail",
+                "description": "Failed to ping or bind Schema Master",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID in (2091,2092) and RenderedDescription has \"Schema\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "gc-promotion-failed",
+                "displayName": "GC Promotion Failed",
+                "description": "Failed to promote server into Global Catalog",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID in (1559,1578,1801) {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "disk-free-any-low",
+                "displayName": "Logical Disk Free Space Low",
+                "description": "Any logical disk free space <10%",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "Perf | where ObjectName == \"LogicalDisk\" and CounterName == \"% Free Space\" | where InstanceName !in (\"_Total\",\"HarddiskVolume*\") | summarize AvgFreePct = avg(CounterValue) by Computer, InstanceName, bin(TimeGenerated,5m)",
+                "metricMeasureColumn": "AvgFreePct",
+                "operator": "LessThan",
+                "threshold": 10,
+                "timeAggregation": "Average"
+              },
+              {
+                "nameSuffix": "disk-free-db-low",
+                "displayName": "AD DB Drive Free Space Low",
+                "description": "DB drive free space <15%",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Perf | where ObjectName == \"LogicalDisk\" and CounterName == \"% Free Space\" and InstanceName == \"{0}\" | summarize AvgFreePct = avg(CounterValue) by Computer, bin(TimeGenerated,5m)', parameters('dbDriveInstanceName'))]",
+                "metricMeasureColumn": "AvgFreePct",
+                "operator": "LessThan",
+                "threshold": 15,
+                "timeAggregation": "Average"
+              },
+              {
+                "nameSuffix": "disk-free-log-low",
+                "displayName": "AD Log Drive Free Space Low",
+                "description": "Log drive free space <15%",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Perf | where ObjectName == \"LogicalDisk\" and CounterName == \"% Free Space\" and InstanceName == \"{0}\" | summarize AvgFreePct = avg(CounterValue) by Computer, bin(TimeGenerated,5m)', parameters('logDriveInstanceName'))]",
+                "metricMeasureColumn": "AvgFreePct",
+                "operator": "LessThan",
+                "threshold": 15,
+                "timeAggregation": "Average"
+              },
+              {
+                "nameSuffix": "netlogon-stopped",
+                "displayName": "NetLogon Service Stopped",
+                "description": "NetLogon service not running",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" and EventID == 7036 and RenderedDescription has \"Netlogon\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "replicated-object-missing",
+                "displayName": "Replicated Object Missing",
+                "description": "Replicated object missing may be garbage collected",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID == 1388 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "schema-change-modify",
+                "displayName": "Schema Change Modify",
+                "description": "Schema modify event",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Security\" and EventID == 5136 and RenderedDescription has \"CN=Schema,CN=Configuration\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "demotion",
+                "displayName": "System Demotion",
+                "description": "Domain controller demotion",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"LsaSrv\" and EventID == 29224 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "unexpected-shutdown",
+                "displayName": "Unexpected Shutdown",
+                "description": "Domain Controller unexpected shutdown",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and EventID == 6008 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "pdc-role-change",
+                "displayName": "PDC Role Change",
+                "description": "Server promoted to PDC Emulator",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Directory Service\" and EventID == 1458 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "time-skew",
+                "displayName": "Time Skew Above Threshold",
+                "description": "Time skew above configured threshold",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Microsoft-Windows-Time-Service\" and EventID == 50 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "time-no-sources",
+                "displayName": "Time Sync No Sources",
+                "description": "Time sync – no time sources",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Microsoft-Windows-Time-Service\" and EventID == 36 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "time-sync-stopped",
+                "displayName": "Time Sync Stopped",
+                "description": "Time Sync stopped",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Microsoft-Windows-Time-Service\" and EventID == 46 {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "lanmanserver-stopped",
+                "displayName": "Server Service Stopped",
+                "description": "Windows Server Service stopped",
+                "severity": "High",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" and EventID == 7036 and RenderedDescription has \"Server\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "promotion",
+                "displayName": "System Promotion",
+                "description": "Domain controller promotion (Info)",
+                "severity": "Info",
+                "frequency": "PT5M",
+                "window": "PT15M",
+                "query": "Event | where EventLog == \"System\" and Source == \"LsaSrv\" and EventID == 29223 | summarize EventCount = count() by bin(TimeGenerated,15m), Computer",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "wins-service",
+                "displayName": "WINS Service State Change",
+                "description": "WINS service state change",
+                "severity": "Low",
+                "frequency": "PT5M",
+                "window": "PT15M",
+                "query": "Event | where EventLog == \"System\" and Source == \"Service Control Manager\" | where EventID == 7036 and RenderedDescription has \"WINS\" | summarize EventCount = count() by bin(TimeGenerated,15m), Computer",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "dns-service-restart",
+                "displayName": "DNS Service Restarted or Stopped",
+                "description": "DNS Service restarted / stopped",
+                "severity": "Medium",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"System\" and Source == \"Service Control Manager\" | where EventID == 7036 and RenderedDescription has \"DNS Server\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              },
+              {
+                "nameSuffix": "schema-update",
+                "displayName": "Schema Update Detected",
+                "description": "Schema update (create/move)",
+                "severity": "Medium",
+                "frequency": "PT5M",
+                "window": "PT5M",
+                "query": "[format('Event | where EventLog == \"Security\" and EventID in (5137,5139) and RenderedDescription has \"CN=Schema,CN=Configuration\" {0}', variables('fiveMinuteCount'))]",
+                "metricMeasureColumn": "EventCount",
+                "operator": "GreaterThanOrEqual",
+                "threshold": 1,
+                "timeAggregation": "Count"
+              }
+            ]
+          },
+          "resources": [
+            {
+              "copy": {
+                "name": "logAlerts",
+                "count": "[length(variables('alertDefinitions'))]"
+              },
+              "type": "Microsoft.Insights/scheduledQueryRules",
+              "apiVersion": "2023-12-01-preview",
+              "name": "[format('{0}-{1}', parameters('alertPrefix'), variables('alertDefinitions')[copyIndex()].nameSuffix)]",
+              "location": "[resourceGroup().location]",
+              "properties": {
+                "displayName": "[variables('alertDefinitions')[copyIndex()].displayName]",
+                "description": "[variables('alertDefinitions')[copyIndex()].description]",
+                "severity": "[variables('severityMap')[variables('alertDefinitions')[copyIndex()].severity]]",
+                "enabled": true,
+                "evaluationFrequency": "[variables('alertDefinitions')[copyIndex()].frequency]",
+                "windowSize": "[variables('alertDefinitions')[copyIndex()].window]",
+                "scopes": [
+                  "[parameters('workspaceId')]"
+                ],
+                "criteria": {
+                  "allOf": [
+                    {
+                      "query": "[variables('alertDefinitions')[copyIndex()].query]",
+                      "timeAggregation": "[variables('alertDefinitions')[copyIndex()].timeAggregation]",
+                      "metricMeasureColumn": "[variables('alertDefinitions')[copyIndex()].metricMeasureColumn]",
+                      "operator": "[variables('alertDefinitions')[copyIndex()].operator]",
+                      "threshold": "[variables('alertDefinitions')[copyIndex()].threshold]",
+                      "name": "[variables('alertDefinitions')[copyIndex()].nameSuffix]",
+                      "dimensions": [],
+                      "failingPeriods": {
+                        "numberOfEvaluationPeriods": 1,
+                        "minFailingPeriodsToAlert": 1
+                      }
+                    }
+                  ]
+                },
+                "actions": {
+                  "actionGroups": [
+                    {
+                      "actionGroupId": "[parameters('actionGroupId')]",
+                      "webHookProperties": {}
+                    }
+                  ]
+                },
+                "autoMitigate": true
+              },
+              "tags": {
+                "solution": "dc-monitor",
+                "category": "ad-domain-controller"
+              }
+            },
+            {
+              "type": "Microsoft.Insights/metricAlerts",
+              "apiVersion": "2021-08-01",
+              "name": "[format('{0}-cpu-high', parameters('alertPrefix'))]",
+              "location": "[resourceGroup().location]",
+              "properties": {
+                "description": "Domain Controller high average CPU",
+                "severity": "[parameters('cpuSeverity')]",
+                "enabled": true,
+                "evaluationFrequency": "PT5M",
+                "windowSize": "PT15M",
+                "autoMitigate": true,
+                "criteria": {
+                  "allOf": [
+                    {
+                      "name": "HighCPU",
+                      "metricName": "Percentage CPU",
+                      "metricNamespace": "Microsoft.Compute/virtualMachines",
+                      "operator": "GreaterThan",
+                      "threshold": "[parameters('cpuThreshold')]",
+                      "timeAggregation": "Average",
+                      "dimensions": [],
+                      "criterionType": "StaticThresholdCriterion"
+                    }
+                  ]
+                },
+                "scopes": "[parameters('cpuScope')]",
+                "actions": [
+                  {
+                    "actionGroupId": "[parameters('actionGroupId')]"
+                  }
+                ]
+              },
+              "tags": {
+                "solution": "dc-monitor"
+              }
+            }
+          ],
+          "outputs": {
+            "scheduledQueryAlertIds": {
+              "type": "array",
+              "copy": {
+                "count": "[length(variables('alertDefinitions'))]",
+                "input": "[resourceId('Microsoft.Insights/scheduledQueryRules', format('{0}-{1}', parameters('alertPrefix'), variables('alertDefinitions')[copyIndex()].nameSuffix))]"
+              }
+            },
+            "cpuAlertId": {
+              "type": "string",
+              "value": "[resourceId('Microsoft.Insights/metricAlerts', format('{0}-cpu-high', parameters('alertPrefix')))]"
+            }
+          }
+        }
+      },
+      "dependsOn": [
+        "[resourceId('Microsoft.Resources/deployments', 'actionGroup')]",
+        "[resourceId('Microsoft.Resources/deployments', 'law')]"
+      ]
+    }
+  ],
+  "outputs": {
+    "workspaceId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'law'), '2022-09-01').outputs.workspaceId.value]"
+    },
+    "actionGroupId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'actionGroup'), '2022-09-01').outputs.actionGroupId.value]"
+    },
+    "dcrId": {
+      "type": "string",
+      "value": "[reference(resourceId('Microsoft.Resources/deployments', 'dcrWinEvents'), '2022-09-01').outputs.dcrId.value]"
+    }
+  }
+}
