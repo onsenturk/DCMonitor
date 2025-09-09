@@ -525,7 +525,7 @@ resource logAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01-preview' =
 @description('Optional: List of VM/Arc machine resource IDs for CPU metric alert')
 param cpuScope array = []
 
-resource cpuAlert 'Microsoft.Insights/metricAlerts@2021-08-01' = {
+resource cpuAlert 'Microsoft.Insights/metricAlerts@2021-08-01' = if (length(cpuScope) > 0) {
   name: '${alertPrefix}-cpu-high'
   location: resourceGroup().location
   properties: {
@@ -563,4 +563,4 @@ resource cpuAlert 'Microsoft.Insights/metricAlerts@2021-08-01' = {
 
 // Output the IDs via resourceId reconstruction (collection direct reference unsupported in output)
 output scheduledQueryAlertIds array = [for def in alertDefinitions: resourceId('Microsoft.Insights/scheduledQueryRules', '${alertPrefix}-${def.nameSuffix}')]
-output cpuAlertId string = cpuAlert.id
+output cpuAlertId string = length(cpuScope) > 0 ? cpuAlert.id : ''
