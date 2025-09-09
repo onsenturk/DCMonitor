@@ -13,6 +13,16 @@ param dbDriveInstanceName string = 'C:'
 @description('LogicalDisk instance name for AD log volume (e.g. C:, D:)')
 param logDriveInstanceName string = 'C:'
 
+// Additional threshold tuning parameters for extended alerts
+@description('Threshold for failed logons within 5 minutes')
+param failedLogonThreshold int = 20
+@description('Threshold for account lockouts within 5 minutes')
+param accountLockoutThreshold int = 3
+@description('Threshold for Kerberos pre-auth failures within 5 minutes')
+param kerberosPreauthFailureThreshold int = 25
+@description('LSASS Private Bytes threshold (bytes) averaged over 15 minutes')
+param lsassPrivateBytesThresholdBytes int = 6442450944 // 6 GB
+
 // Query samples
 // (Legacy sample queries removed in favor of structured alertDefinitions list.)
 
@@ -470,6 +480,273 @@ var alertDefinitions = [
     frequency: 'PT5M'
     window: 'PT5M'
   query: 'Event | where EventLog == "Security" and EventID in (5137,5139) and RenderedDescription has "CN=Schema,CN=Configuration" ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+
+  // --- Additional Alerts ---
+  // Critical / High replication & directory health
+  {
+    nameSuffix: 'usn-rollback'
+    displayName: 'USN Rollback Detected'
+    description: 'USN rollback detected (EventID 2095)'
+    severity: 'Critical'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 2095 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'replication-link-failure'
+    displayName: 'Replication Link Failure'
+    description: 'Replication link failure (EventID 1925)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 1925 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'rid-pool-low'
+    displayName: 'RID Pool Low'
+    description: 'RID pool low warning (EventID 16645)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 16645 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'rid-pool-exhaust'
+    displayName: 'RID Pool Exhaustion'
+    description: 'RID pool exhaustion (EventID 16654)'
+    severity: 'Critical'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 16654 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'gc-not-advertising'
+    displayName: 'GC Not Advertising'
+    description: 'Global Catalog not advertising (EventID 2108)'
+    severity: 'Critical'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 2108 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'dns-srv-reg-failure'
+    displayName: 'DNS SRV Registration Failure'
+    description: 'DNS SRV registration failures (2087/2088)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID in (2087,2088) ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+
+  // Security / authentication bursts
+  {
+    nameSuffix: 'failed-logons-burst'
+    displayName: 'Failed Logons Burst'
+    description: 'Excessive failed logons (4625)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Security" and EventID == 4625 | summarize Failures = count() by bin(TimeGenerated,5m), Computer'
+    metricMeasureColumn: 'Failures'
+    operator: 'GreaterThan'
+    threshold: failedLogonThreshold
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'account-lockout-burst'
+    displayName: 'Account Lockout Burst'
+    description: 'Account lockout spike (4740)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Security" and EventID == 4740 | summarize Lockouts = count() by bin(TimeGenerated,5m), Computer'
+    metricMeasureColumn: 'Lockouts'
+    operator: 'GreaterThan'
+    threshold: accountLockoutThreshold
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'sensitive-group-change'
+    displayName: 'Sensitive Group Membership Change'
+    description: 'Privileged group membership change (4728/4729/4732/4733/4756/4757)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Security" and EventID in (4728,4729,4732,4733,4756,4757) ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'new-user-priv-change'
+    displayName: 'New User Privileged Change Correlation'
+    description: 'New user creation followed by privileged group change within 10m'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT10M'
+    query: 'let Window=10m; let PrivEvents=dynamic([4728,4729,4732,4733,4756,4757]); Event | where EventLog == "Security" and EventID in (4720,4728,4729,4732,4733,4756,4757) | summarize IDs=make_set(EventID) by bin(TimeGenerated, Window), Computer | where array_index_of(IDs,4720) != -1 and array_length(set_intersection(IDs, PrivEvents)) > 0 | summarize Correlated = count() by bin(TimeGenerated, Window), Computer'
+    metricMeasureColumn: 'Correlated'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'priv-pwd-reset'
+    displayName: 'Privileged Password Reset'
+    description: 'Password reset event (4724)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Security" and EventID == 4724 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'kerberos-preauth-failures'
+    displayName: 'Kerberos Pre-auth Failures Burst'
+    description: 'Kerberos pre-auth failures (4771/4776)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Security" and EventID in (4771,4776) | summarize Failures = count() by bin(TimeGenerated,5m), Computer'
+    metricMeasureColumn: 'Failures'
+    operator: 'GreaterThan'
+    threshold: kerberosPreauthFailureThreshold
+    timeAggregation: 'Count'
+  }
+
+  // Performance / service health
+  {
+    nameSuffix: 'lsass-high-memory'
+    displayName: 'LSASS High Memory'
+    description: 'LSASS private bytes high'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT15M'
+    query: 'Perf | where ObjectName == "Process" and CounterName == "Private Bytes" and InstanceName == "lsass" | summarize AvgPrivateBytes = avg(CounterValue) by Computer, bin(TimeGenerated,15m)'
+    metricMeasureColumn: 'AvgPrivateBytes'
+    operator: 'GreaterThan'
+    threshold: lsassPrivateBytesThresholdBytes
+    timeAggregation: 'Average'
+  }
+  {
+    nameSuffix: 'netlogon-secure-channel-failure'
+    displayName: 'Netlogon Secure Channel Failure'
+    description: 'Secure channel setup failure (5719)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "System" and EventID == 5719 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'heartbeat-missing'
+    displayName: 'Heartbeat Missing >10m'
+    description: 'No heartbeat in last 10 minutes'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT15M'
+    query: 'Heartbeat | summarize LastSeen=max(TimeGenerated) by Computer | where LastSeen < ago(10m) | summarize Missing = count() by bin(TimeGenerated,5m)'
+    metricMeasureColumn: 'Missing'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'dfs-backlog'
+    displayName: 'DFS Replication Backlog'
+    description: 'DFS replication backlog / journal (2212/2214)'
+    severity: 'High'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "DFS Replication" and EventID in (2212,2214) ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'gpo-processing-failure'
+    displayName: 'GPO Processing Failure'
+    description: 'Group Policy processing failures (1058/1030)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "System" and EventID in (1058,1030) ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'kdc-cert-issue'
+    displayName: 'KDC Certificate Issue'
+    description: 'KDC certificate issue (EventID 29)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "System" and Source == "Kerberos-Key-Distribution-Center" and EventID == 29 ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'schannel-errors'
+    displayName: 'Schannel Errors'
+    description: 'Schannel critical errors (36882/36884)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "System" and Source == "Schannel" and EventID in (36882,36884) ${fiveMinuteCount}'
+    metricMeasureColumn: 'EventCount'
+    operator: 'GreaterThanOrEqual'
+    threshold: 1
+    timeAggregation: 'Count'
+  }
+  {
+    nameSuffix: 'ldap-insecure-bind'
+    displayName: 'LDAP Insecure Bind'
+    description: 'Insecure LDAP bind attempt (EventID 2889)'
+    severity: 'Medium'
+    frequency: 'PT5M'
+    window: 'PT5M'
+    query: 'Event | where EventLog == "Directory Service" and EventID == 2889 ${fiveMinuteCount}'
     metricMeasureColumn: 'EventCount'
     operator: 'GreaterThanOrEqual'
     threshold: 1

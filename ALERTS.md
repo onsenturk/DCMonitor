@@ -19,8 +19,13 @@ Unless otherwise noted:
 - Log drive logical disk instance: `logDriveInstanceName` (default `C:`)
 - Prefix: `alertPrefix`
 - CPU alert threshold & severity: `cpuThreshold` (default 85), `cpuSeverity` (default 2 / Medium)
+- Extended security / performance thresholds:
+	- `failedLogonThreshold` (default 20)
+	- `accountLockoutThreshold` (default 3)
+	- `kerberosPreauthFailureThreshold` (default 25)
+	- `lsassPrivateBytesThresholdBytes` (default 6442450944)
 
-## Scheduled Query Alerts (34)
+## Scheduled Query Alerts (54)
 | # | Rule Name (default) | Display Name | Severity | Freq | Window | Condition | Description |
 |--:|----------------------|--------------|---------|------|--------|-----------|-------------|
 | 1 | dc-ad-db-corrupt | AD DB Corrupt | Critical (0) | PT5M | PT5M | EventCount >= 1 | Active Directory database is corrupt |
@@ -57,6 +62,26 @@ Unless otherwise noted:
 | 32 | dc-wins-service | WINS Service State Change | Low (3) | PT5M | PT15M | EventCount >= 1 | WINS service state change |
 | 33 | dc-dns-service-restart | DNS Service Restarted or Stopped | Medium (2) | PT5M | PT5M | EventCount >= 1 | DNS Service restarted/stopped |
 | 34 | dc-schema-update | Schema Update Detected | Medium (2) | PT5M | PT5M | EventCount >= 1 | Schema update (create/move) |
+| 35 | dc-usn-rollback | USN Rollback Detected | Critical (0) | PT5M | PT5M | EventCount >= 1 | USN rollback detected |
+| 36 | dc-replication-link-failure | Replication Link Failure | High (1) | PT5M | PT5M | EventCount >= 1 | Replication link failure |
+| 37 | dc-rid-pool-low | RID Pool Low | High (1) | PT5M | PT5M | EventCount >= 1 | RID pool low warning |
+| 38 | dc-rid-pool-exhaust | RID Pool Exhaustion | Critical (0) | PT5M | PT5M | EventCount >= 1 | RID pool exhaustion |
+| 39 | dc-gc-not-advertising | GC Not Advertising | Critical (0) | PT5M | PT5M | EventCount >= 1 | Global Catalog not advertising |
+| 40 | dc-dns-srv-reg-failure | DNS SRV Registration Failure | High (1) | PT5M | PT5M | EventCount >= 1 | DNS SRV registration failures |
+| 41 | dc-failed-logons-burst | Failed Logons Burst | High (1) | PT5M | PT5M | Failures > failedLogonThreshold | Excessive failed logons |
+| 42 | dc-account-lockout-burst | Account Lockout Burst | High (1) | PT5M | PT5M | Lockouts > accountLockoutThreshold | Account lockout spike |
+| 43 | dc-sensitive-group-change | Sensitive Group Membership Change | High (1) | PT5M | PT5M | EventCount >= 1 | Privileged group membership change |
+| 44 | dc-new-user-priv-change | New User Privileged Change Correlation | High (1) | PT5M | PT10M | Correlated >= 1 | New user plus privileged change |
+| 45 | dc-priv-pwd-reset | Privileged Password Reset | High (1) | PT5M | PT5M | EventCount >= 1 | Privileged account password reset |
+| 46 | dc-kerberos-preauth-failures | Kerberos Pre-auth Failures Burst | Medium (2) | PT5M | PT5M | Failures > kerberosPreauthFailureThreshold | Kerberos pre-auth failures burst |
+| 47 | dc-lsass-high-memory | LSASS High Memory | Medium (2) | PT5M | PT15M | AvgPrivateBytes > lsassPrivateBytesThresholdBytes | LSASS private bytes high |
+| 48 | dc-netlogon-secure-channel-failure | Netlogon Secure Channel Failure | Medium (2) | PT5M | PT5M | EventCount >= 1 | Secure channel setup failure |
+| 49 | dc-heartbeat-missing | Heartbeat Missing >10m | High (1) | PT5M | PT15M | Missing >= 1 | No heartbeat >10m |
+| 50 | dc-dfs-backlog | DFS Replication Backlog | High (1) | PT5M | PT5M | EventCount >= 1 | DFS replication backlog / journal |
+| 51 | dc-gpo-processing-failure | GPO Processing Failure | Medium (2) | PT5M | PT5M | EventCount >= 1 | Group Policy processing failures |
+| 52 | dc-kdc-cert-issue | KDC Certificate Issue | Medium (2) | PT5M | PT5M | EventCount >= 1 | KDC certificate issue |
+| 53 | dc-schannel-errors | Schannel Errors | Medium (2) | PT5M | PT5M | EventCount >= 1 | Schannel critical errors |
+| 54 | dc-ldap-insecure-bind | LDAP Insecure Bind | Medium (2) | PT5M | PT5M | EventCount >= 1 | Insecure LDAP bind attempt |
 
 ## Optional Metric Alert
 | Rule Name (default) | Type | Condition | Notes |
@@ -261,5 +286,105 @@ Event | where EventLog == "System" and Source == "Service Control Manager" | whe
 ### 34. Schema Update Detected (`dc-schema-update`)
 ```
 Event | where EventLog == "Security" and EventID in (5137,5139) and RenderedDescription has "CN=Schema,CN=Configuration" | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 35. USN Rollback Detected (`dc-usn-rollback`)
+```
+Event | where EventLog == "Directory Service" and EventID == 2095 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 36. Replication Link Failure (`dc-replication-link-failure`)
+```
+Event | where EventLog == "Directory Service" and EventID == 1925 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 37. RID Pool Low (`dc-rid-pool-low`)
+```
+Event | where EventLog == "Directory Service" and EventID == 16645 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 38. RID Pool Exhaustion (`dc-rid-pool-exhaust`)
+```
+Event | where EventLog == "Directory Service" and EventID == 16654 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 39. GC Not Advertising (`dc-gc-not-advertising`)
+```
+Event | where EventLog == "Directory Service" and EventID == 2108 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 40. DNS SRV Registration Failure (`dc-dns-srv-reg-failure`)
+```
+Event | where EventLog == "Directory Service" and EventID in (2087,2088) | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 41. Failed Logons Burst (`dc-failed-logons-burst`)
+```
+Event | where EventLog == "Security" and EventID == 4625 | summarize Failures = count() by bin(TimeGenerated,5m), Computer
+```
+
+### 42. Account Lockout Burst (`dc-account-lockout-burst`)
+```
+Event | where EventLog == "Security" and EventID == 4740 | summarize Lockouts = count() by bin(TimeGenerated,5m), Computer
+```
+
+### 43. Sensitive Group Membership Change (`dc-sensitive-group-change`)
+```
+Event | where EventLog == "Security" and EventID in (4728,4729,4732,4733,4756,4757) | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 44. New User Privileged Change Correlation (`dc-new-user-priv-change`)
+```
+let Window=10m; let PrivEvents=dynamic([4728,4729,4732,4733,4756,4757]); Event | where EventLog == "Security" and EventID in (4720,4728,4729,4732,4733,4756,4757) | summarize IDs=make_set(EventID) by bin(TimeGenerated, Window), Computer | where array_index_of(IDs,4720) != -1 and array_length(set_intersection(IDs, PrivEvents)) > 0 | summarize Correlated = count() by bin(TimeGenerated, Window), Computer
+```
+
+### 45. Privileged Password Reset (`dc-priv-pwd-reset`)
+```
+Event | where EventLog == "Security" and EventID == 4724 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 46. Kerberos Pre-auth Failures Burst (`dc-kerberos-preauth-failures`)
+```
+Event | where EventLog == "Security" and EventID in (4771,4776) | summarize Failures = count() by bin(TimeGenerated,5m), Computer
+```
+
+### 47. LSASS High Memory (`dc-lsass-high-memory`)
+```
+Perf | where ObjectName == "Process" and CounterName == "Private Bytes" and InstanceName == "lsass" | summarize AvgPrivateBytes = avg(CounterValue) by Computer, bin(TimeGenerated,15m)
+```
+
+### 48. Netlogon Secure Channel Failure (`dc-netlogon-secure-channel-failure`)
+```
+Event | where EventLog == "System" and EventID == 5719 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 49. Heartbeat Missing >10m (`dc-heartbeat-missing`)
+```
+Heartbeat | summarize LastSeen=max(TimeGenerated) by Computer | where LastSeen < ago(10m) | summarize Missing = count() by bin(TimeGenerated,5m)
+```
+
+### 50. DFS Replication Backlog (`dc-dfs-backlog`)
+```
+Event | where EventLog == "DFS Replication" and EventID in (2212,2214) | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 51. GPO Processing Failure (`dc-gpo-processing-failure`)
+```
+Event | where EventLog == "System" and EventID in (1058,1030) | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 52. KDC Certificate Issue (`dc-kdc-cert-issue`)
+```
+Event | where EventLog == "System" and Source == "Kerberos-Key-Distribution-Center" and EventID == 29 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 53. Schannel Errors (`dc-schannel-errors`)
+```
+Event | where EventLog == "System" and Source == "Schannel" and EventID in (36882,36884) | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
+```
+
+### 54. LDAP Insecure Bind (`dc-ldap-insecure-bind`)
+```
+Event | where EventLog == "Directory Service" and EventID == 2889 | summarize EventCount = count() by bin(TimeGenerated, 5m), Computer
 ```
 
