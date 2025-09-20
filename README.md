@@ -26,6 +26,17 @@ New-AzResourceGroupDeployment -ResourceGroupName rg-onprem -TemplateFile main.bi
 
 (Or convert to `az deployment group create`.)
 
+## Assign DCR to the Domain Controllers
+$DcrId = (az monitor data-collection rule list -g rg-onprem --query "[?name=='dcrWinEvents'].id" -o tsv)
+
+az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem"
+az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem-02"
+az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/VM-Spoke1"
+
+## Verify deployments
+az monitor data-collection rule association list --resource "/subscriptions/<subId>/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/VM-Spoke1" -o table
+
+
 ## Next Steps
 1. Provide exact Event IDs & thresholds.
 2. Supply DC VM or Arc resource IDs for `dcResourceIds` in parameters.

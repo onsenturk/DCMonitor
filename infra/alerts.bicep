@@ -835,7 +835,8 @@ param cpuScope array = []
 
 resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (length(cpuScope) > 0) {
   name: '${alertPrefix}-cpu-high'
-  location: resourceGroup().location
+  // Use global to avoid region mismatch when VMs span multiple regions
+  location: 'global'
   properties: {
     description: 'Domain Controller high average CPU'
     severity: cpuSeverity
