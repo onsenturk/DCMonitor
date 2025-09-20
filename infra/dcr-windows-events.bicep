@@ -24,6 +24,10 @@ param channels array = [
     name: 'Security'
     xPathQueries: [ 'Security!*' ]
   }
+  {
+    name: 'DFS Replication'
+    xPathQueries: [ 'DFS Replication!*' ]
+  }
 ]
 
 @description('Enable performance counter collection (LogicalDisk % Free Space)')
@@ -37,6 +41,14 @@ var perfCounters = enablePerfCounters ? [
     samplingFrequencyInSeconds: 60
     counterSpecifiers: [
       '\\LogicalDisk(*)\\% Free Space'
+    ]
+  }
+  {
+    name: 'perf-process-lsass-privatebytes'
+    streams: [ 'Microsoft-Perf' ]
+    samplingFrequencyInSeconds: 60
+    counterSpecifiers: [
+      '\\Process(lsass)\\Private Bytes'
     ]
   }
 ] : []

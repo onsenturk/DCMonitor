@@ -832,8 +832,10 @@ resource logAlertsMetric 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [
 
 @description('Optional: List of VM/Arc machine resource IDs for CPU metric alert')
 param cpuScope array = []
+@description('Enable the CPU metric alert (set true only after verifying all VM resource IDs resolve)')
+param enableCpuMetricAlert bool = false
 
-resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (length(cpuScope) > 0) {
+resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (enableCpuMetricAlert && length(cpuScope) > 0) {
   name: '${alertPrefix}-cpu-high'
   // Use global to avoid region mismatch when VMs span multiple regions
   location: 'global'
@@ -844,6 +846,9 @@ resource cpuAlert 'Microsoft.Insights/metricAlerts@2018-03-01' = if (length(cpuS
     evaluationFrequency: 'PT5M'
     windowSize: 'PT15M'
     autoMitigate: true
+    // Explicitly declare target resource metadata to satisfy validation when using multi-resource scopes
+    targetResourceType: 'Microsoft.Compute/virtualMachines'
+    targetResourceRegion: resourceGroup().location
     criteria: {
       'odata.type': 'Microsoft.Azure.Monitor.MultipleResourceMultipleMetricCriteria'
       allOf: [

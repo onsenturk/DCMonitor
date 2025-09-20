@@ -8,6 +8,8 @@ param emailReceivers array = []
 param dcResourceIds array = []
 @description('Scope for CPU metric alert (VM/Arc resource IDs) if different from dcResourceIds')
 param cpuScope array = []
+@description('Enable the CPU metric metric alert (set after validating VM IDs)')
+param enableCpuMetricAlert bool = false
 
 @description('Workspace retention days')
 param retentionInDays int = 90
@@ -47,11 +49,15 @@ module alerts './alerts.bicep' = {
   params: {
     workspaceId: law.outputs.workspaceId
     actionGroupId: ag.outputs.actionGroupId
-  cpuScope: length(cpuScope) > 0 ? cpuScope : dcResourceIds
+  cpuScope: cpuScope
+  enableCpuMetricAlert: enableCpuMetricAlert
   dbDriveInstanceName: dbDriveInstanceName
   logDriveInstanceName: logDriveInstanceName
   }
 }
+
+// NOTE: dcResourceIds retained for potential future per-DC scoping (currently only used manually for DCR association and optional metric alert). Referenced below to avoid unused warning.
+output providedDcResourceIds array = dcResourceIds
 
 output workspaceId string = law.outputs.workspaceId
 output actionGroupId string = ag.outputs.actionGroupId
