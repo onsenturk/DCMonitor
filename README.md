@@ -26,16 +26,29 @@ New-AzResourceGroupDeployment -ResourceGroupName rg-onprem -TemplateFile main.bi
 
 (Or convert to `az deployment group create`.)
 
-## Assign DCR to the Domain Controllers
-$DcrId = (az monitor data-collection rule list -g rg-onprem --query "[?name=='dcrWinEvents'].id" -o tsv)
+## Assign the DCRs to the VMs
+az extension add --name monitor-control-service --yes
 
-az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem"
-az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem-02"
-az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/VM-Spoke1"
+$DcrId = az monitor data-collection rule list -g rg-onprem --query "[?name=='dcr-dc-winevents'].id | [0]" -o tsv
+
+
+az monitor data-collection rule association create --name default --rule-id $DcrId --resource "/subscriptions/<subId>/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/<vm-name>"
+
 
 ## Verify deployments
-az monitor data-collection rule association list --resource "/subscriptions/<subId>/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/VM-Spoke1" -o table
+az monitor data-collection rule association list --resource "/subscriptions/<subId>/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/<vm-name>" -o table
 
+
+## Validate in a few mins with the following KQLs
+Heartbeat
+| where Computer startswith "<YourDCName>"
+| take 5
+
+
+Event
+| where Source in ('Microsoft-Windows-ActiveDirectory_DomainService','DNS Server','Microsoft-Windows-Time-Service')
+| where TimeGenerated > ago(30m)
+| summarize count() by Source
 
 ## Next Steps
 1. Provide exact Event IDs & thresholds.
