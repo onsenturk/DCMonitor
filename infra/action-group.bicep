@@ -6,7 +6,7 @@ param shortName string = 'DCMON'
 @description('Email recipients for alerts')
 param emailReceivers array = [] // [{ name: 'Ops', emailAddress: 'ops@example.com', useCommonAlertSchema: true }]
 
-resource ag 'Microsoft.Insights/actionGroups@2022-06-15' = {
+resource ag 'Microsoft.Insights/actionGroups@2023-01-01' = {
   name: actionGroupName
   location: 'global'
   properties: {

@@ -6,7 +6,7 @@
     "workspaceName": { "value": "law-dc-monitor-dev" },
     "emailReceivers": {
       "value": [
-        { "name": "Ops", "emailAddress": "replace_me@example.com", "useCommonAlertSchema": true }
+        { "name": "Ops", "emailAddress": "onursenturk@microsoft.com", "useCommonAlertSchema": true }
       ]
     },
     "dcResourceIds": { "value": [] }

@@ -16,9 +16,13 @@ Adjust `infra/main.parameters.json` then deploy:
 # Validate
 New-AzResourceGroupDeployment -ResourceGroupName <rg> -TemplateFile .\infra\main.bicep -TemplateParameterFile .\infra\main.parameters.json -WhatIf
 
+New-AzResourceGroupDeployment -ResourceGroupName rg-onprem -TemplateFile main.bicep -TemplateParameterFile main.parameters.json -WhatIf
+
 # Deploy
 New-AzResourceGroupDeployment -ResourceGroupName <rg> -TemplateFile .\infra\main.bicep -TemplateParameterFile .\infra\main.parameters.json
 ```
+
+New-AzResourceGroupDeployment -ResourceGroupName rg-onprem -TemplateFile main.bicep -TemplateParameterFile main.parameters.json
 
 (Or convert to `az deployment group create`.)
 

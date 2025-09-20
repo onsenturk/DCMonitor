@@ -6,23 +6,23 @@ param dcrName string = 'dcr-dc-winevents'
 param channels array = [
   {
     name: 'System'
-    xPathQueries: [ '*' ]
+    xPathQueries: [ 'System!*' ]
   }
   {
     name: 'Application'
-    xPathQueries: [ '*' ]
+    xPathQueries: [ 'Application!*' ]
   }
   {
     name: 'Directory Service'
-    xPathQueries: [ '*' ]
+    xPathQueries: [ 'Directory Service!*' ]
   }
   {
     name: 'DNS Server'
-    xPathQueries: [ '*' ]
+    xPathQueries: [ 'DNS Server!*' ]
   }
   {
     name: 'Security'
-    xPathQueries: [ '*' ]
+    xPathQueries: [ 'Security!*' ]
   }
 ]
 
@@ -57,13 +57,11 @@ resource dcr 'Microsoft.Insights/dataCollectionRules@2022-06-01' = {
       {
         streams: [ 'Microsoft-Event' ]
         destinations: [ 'ladest' ]
-        transformKql: ''
       }
     ], enablePerfCounters ? [
       {
         streams: [ 'Microsoft-Perf' ]
         destinations: [ 'ladest' ]
-        transformKql: ''
       }
     ] : [])
     dataSources: {
