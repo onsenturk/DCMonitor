@@ -9,6 +9,8 @@
         { "name": "Ops", "emailAddress": "onursenturk@microsoft.com", "useCommonAlertSchema": true }
       ]
     },
-    "dcResourceIds": { "value": [] }
+    "dcResourceIds": { "value": ["/subscriptions/d581e768-d59c-472d-b32e-b3ad3c6ef9c7/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem", 
+    "/subscriptions/d581e768-d59c-472d-b32e-b3ad3c6ef9c7/resourceGroups/rg-onprem/providers/Microsoft.Compute/virtualMachines/VM-OnPrem-02",
+    "/subscriptions/d581e768-d59c-472d-b32e-b3ad3c6ef9c7/resourceGroups/rg-spoke1/providers/Microsoft.Compute/virtualMachines/VM-Spoke1"] }
   }
 }

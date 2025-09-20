@@ -40,6 +40,17 @@ module dcr './dcr-windows-events.bicep' = {
   }
 }
 
+// Associate Data Collection Rule with each Domain Controller (supports VM & Arc based on resource ID substring)
+module dcrAssoc './dcr-association.bicep' = [for id in dcResourceIds: {
+  name: 'dcrAssoc-${uniqueString(id)}'
+  params: {
+    vmName: contains(toLower(id), 'microsoft.compute/virtualmachines') ? last(split(id, '/')) : ''
+    arcMachineName: contains(toLower(id), 'microsoft.hybridcompute/machines') ? last(split(id, '/')) : ''
+    dcrId: dcr.outputs.dcrId
+    targetType: contains(toLower(id), 'microsoft.compute/virtualmachines') ? 'vm' : 'arc'
+  }
+}]
+
 // Alerts module (scheduled query + metric)
 module alerts './alerts.bicep' = {
   name: 'alerts'
@@ -55,3 +66,4 @@ module alerts './alerts.bicep' = {
 output workspaceId string = law.outputs.workspaceId
 output actionGroupId string = ag.outputs.actionGroupId
 output dcrId string = dcr.outputs.dcrId
+// (Optional) Could output association IDs if needed; omitted to avoid collection iteration issues.

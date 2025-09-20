@@ -614,7 +614,7 @@ var alertDefinitions = [
     severity: 'High'
     frequency: 'PT5M'
     window: 'PT10M'
-    query: 'let Window=10m; let PrivEvents=dynamic([4728,4729,4732,4733,4756,4757]); Event | where EventLog == "Security" and EventID in (4720,4728,4729,4732,4733,4756,4757) | summarize IDs=make_set(EventID) by bin(TimeGenerated, Window), Computer | where array_index_of(IDs,4720) != -1 and array_length(set_intersection(IDs, PrivEvents)) > 0 | summarize Correlated = count() by bin(TimeGenerated, Window), Computer'
+  query: 'let Window=10m; let PrivEvents=dynamic([4728,4729,4732,4733,4756,4757]); Event | where EventLog == "Security" and EventID in (4720,4728,4729,4732,4733,4756,4757) | summarize hasCreate = any(EventID == 4720), hasPriv = any(EventID in (4728,4729,4732,4733,4756,4757)) by bin(TimeGenerated, Window), Computer | where hasCreate and hasPriv | project TimeGenerated, Computer, Correlated=1 | summarize Correlated = count() by bin(TimeGenerated, Window), Computer'
     metricMeasureColumn: 'Correlated'
     operator: 'GreaterThanOrEqual'
     threshold: 1
@@ -681,7 +681,7 @@ var alertDefinitions = [
     severity: 'High'
     frequency: 'PT5M'
     window: 'PT15M'
-    query: 'Heartbeat | summarize LastSeen=max(TimeGenerated) by Computer | where LastSeen < ago(10m) | summarize Missing = count() by bin(TimeGenerated,5m)'
+  query: 'Heartbeat | summarize LastSeen=max(TimeGenerated) by Computer | where LastSeen < ago(10m) | extend TimeGenerated=LastSeen | summarize Missing = count() by bin(TimeGenerated,5m), Computer'
     metricMeasureColumn: 'Missing'
     operator: 'GreaterThanOrEqual'
     threshold: 1
@@ -754,8 +754,45 @@ var alertDefinitions = [
   }
 ]
 
-// Scheduled Query Rules loop
-resource logAlerts 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [for def in alertDefinitions: {
+// Scheduled Query Rules loops split to handle Count vs other aggregations (metricMeasureColumn forbidden with Count)
+resource logAlertsCount 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [for def in alertDefinitions: if (def.timeAggregation == 'Count') {
+  name: '${alertPrefix}-${def.nameSuffix}'
+  location: resourceGroup().location
+  properties: {
+    displayName: def.displayName
+    description: def.description
+    severity: severityMap[def.severity]
+    enabled: true
+    evaluationFrequency: def.frequency
+    windowSize: def.window
+    scopes: [ workspaceId ]
+    criteria: {
+      allOf: [
+        {
+          query: def.query
+          timeAggregation: def.timeAggregation
+          operator: def.operator
+          threshold: def.threshold
+          dimensions: []
+          failingPeriods: {
+            numberOfEvaluationPeriods: 1
+            minFailingPeriodsToAlert: 1
+          }
+        }
+      ]
+    }
+    actions: {
+      actionGroups: [ actionGroupId ]
+    }
+    autoMitigate: true
+  }
+  tags: {
+    solution: 'dc-monitor'
+    category: 'ad-domain-controller'
+  }
+}]
+
+resource logAlertsMetric 'Microsoft.Insights/scheduledQueryRules@2023-12-01' = [for def in alertDefinitions: if (def.timeAggregation != 'Count') {
   name: '${alertPrefix}-${def.nameSuffix}'
   location: resourceGroup().location
   properties: {
